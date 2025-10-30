@@ -1,0 +1,26 @@
+{
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "nodeVersion": "18.x",
+  "env": [
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_URL",
+      "description": "Supabase プロジェクトURL"
+    },
+    {
+      "key": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "description": "Supabase Anon Key"
+    },
+    {
+      "key": "NEXT_PUBLIC_IO_INTELLIGENCE_API_KEY",
+      "description": "IO.Intelligence API Key"
+    },
+    {
+      "key": "NEXT_PUBLIC_IO_INTELLIGENCE_API_URL",
+      "description": "IO.Intelligence API URL",
+      "value": "https://api.io-intelligence.ai"
+    }
+  ]
+}
