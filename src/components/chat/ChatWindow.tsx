@@ -38,7 +38,7 @@ export default function ChatWindow({
   // ページロード時にチャットログを取得
   useEffect(() => {
     const storedMessages = localStorage.getItem(
-      `omamori_chat_${oshigami.id}`
+      `omamori_chat_${guestId}_${oshigami.id}`
     );
     if (storedMessages) {
       setMessages(JSON.parse(storedMessages));
@@ -52,7 +52,7 @@ export default function ChatWindow({
       };
       setMessages([welcomeMessage]);
     }
-  }, [oshigami.id, oshigami.name, oshigami.personality]);
+  }, [guestId, oshigami.id, oshigami.name, oshigami.personality]);
 
   // メッセージ送信時に自動スクロール
   useEffect(() => {
@@ -99,7 +99,7 @@ export default function ChatWindow({
       // localStorageに保存
       const updatedMessages = [...messages, newUserMessage, newAiMessage];
       localStorage.setItem(
-        `omamori_chat_${oshigami.id}`,
+        `omamori_chat_${guestId}_${oshigami.id}`,
         JSON.stringify(updatedMessages)
       );
     } catch (error) {
