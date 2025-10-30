@@ -273,3 +273,402 @@ I --> J3[神社別レポート]
 * **Next.js × Supabase** によりバックエンドレス構成を実現。
 * **IO.Intelligence** により「人格AI」と「行動分析AI」を統合。
 * フェーズごとにログイン機能・課金機能を段階追加可能な柔軟設計。
+
+---
+
+## 11. 開発環境セットアップ
+
+### 11.1 前提条件
+
+- Node.js 18+ / npm or yarn
+- git
+- Supabase CLI
+- IO.Intelligence API キー
+
+### 11.2 環境構築手順
+
+**1. リポジトリクローン**
+```bash
+git clone https://github.com/ktomoyuki0227/omamori.git
+cd omamori
+```
+
+**2. 依存パッケージインストール**
+```bash
+npm install
+# または
+yarn install
+```
+
+**3. 環境変数設定**
+`.env.local` を作成し、以下を設定：
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+
+# IO.Intelligence
+NEXT_PUBLIC_IO_INTELLIGENCE_API_KEY=your-api-key
+NEXT_PUBLIC_IO_INTELLIGENCE_API_URL=https://api.io-intelligence.ai
+
+# ローカル開発フラグ
+NEXT_PUBLIC_DEBUG_MODE=true
+```
+
+**4. Supabase初期セットアップ**
+```bash
+supabase link --project-ref your-project-ref
+supabase db push
+```
+
+**5. ローカル開発サーバー起動**
+```bash
+npm run dev
+# http://localhost:3000 にアクセス
+```
+
+---
+
+## 12. API詳細仕様
+
+### 12.1 キャラAI チャットAPI
+
+**エンドポイント**
+```
+POST /api/ai-chat
+```
+
+**リクエストスキーマ**
+```json
+{
+  "guest_id": "string (UUID形式)",
+  "prompt": "string (ユーザーメッセージ, 最大1000文字)",
+  "oshigami_id": "string (UUID形式, 推し神ID)",
+  "shrine_id": "string (UUID形式, オプション)"
+}
+```
+
+**レスポンススキーマ**
+```json
+{
+  "success": true,
+  "data": {
+    "reply": "string (AI返信メッセージ)",
+    "emotion": "string (joy|sadness|neutral|encouragement)",
+    "blessing": "string (オプション：御朱印コメント)",
+    "timestamp": "ISO8601形式"
+  },
+  "error": null
+}
+```
+
+**エラーレスポンス**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "string (INVALID_GUEST_ID|API_RATE_LIMIT|IO_ERROR)",
+    "message": "string"
+  }
+}
+```
+
+---
+
+### 12.2 おつとめ（寄付）API
+
+**エンドポイント**
+```
+POST /api/donation
+```
+
+**リクエストスキーマ**
+```json
+{
+  "guest_id": "string (UUID)",
+  "shrine_id": "string (UUID)",
+  "point": "number (1-100)",
+  "event_type": "string (prayer|blessing|visit)"
+}
+```
+
+**レスポンススキーマ**
+```json
+{
+  "success": true,
+  "data": {
+    "donation_id": "string (UUID)",
+    "total_points": "number (累計ポイント)",
+    "message": "string (お礼メッセージ)"
+  }
+}
+```
+
+---
+
+### 12.3 分析API（Intelligence）
+
+**エンドポイント**
+```
+POST /api/intelligence
+```
+
+**リクエストスキーマ**
+```json
+{
+  "guest_id": "string (UUID)",
+  "analysis_type": "string (behavior|donation_trend|retention)"
+}
+```
+
+**レスポンススキーマ**
+```json
+{
+  "success": true,
+  "data": {
+    "top_shrine": "string (最も寄付した神社)",
+    "growth_rate": "number (成長率, 0.0-1.0)",
+    "retention": "number (継続率, 0.0-1.0)",
+    "active_hours": ["string (ISO時刻)"],
+    "recommendations": ["string"]
+  }
+}
+```
+
+---
+
+### 12.4 レート制限
+
+| API             | 制限値           | リセット    |
+| --------------- | --------------- | ------- |
+| `/api/ai-chat`  | 30回/時間/ユーザー | 1時間ごと   |
+| `/api/donation` | 100回/日/ユーザー | 00:00 UTC |
+| `/api/intelligence` | 1回/日/ユーザー   | 00:00 UTC |
+
+---
+
+## 13. Supabase データベース初期化
+
+### 13.1 マイグレーション実行
+
+`supabase/migrations/` 配下に以下のSQLファイルを配置：
+
+**001_create_base_tables.sql** （テーブル作成）
+```sql
+-- ユーザー（guest）テーブル
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) UNIQUE NOT NULL,
+  oshigami_id UUID REFERENCES oshigami(id),
+  total_points INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 推し神テーブル
+CREATE TABLE oshigami (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  personality_prompt TEXT NOT NULL,
+  blessing_type VARCHAR(50),
+  image_url TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 神社テーブル
+CREATE TABLE shrines (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(100) NOT NULL,
+  location VARCHAR(255),
+  description TEXT,
+  image_url TEXT,
+  verified BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 寄付ログテーブル
+CREATE TABLE donation_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  shrine_id UUID REFERENCES shrines(id),
+  point INTEGER NOT NULL DEFAULT 1,
+  event_type VARCHAR(50) DEFAULT 'prayer',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- チャットログテーブル
+CREATE TABLE chat_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  oshigami_id UUID REFERENCES oshigami(id),
+  user_message TEXT NOT NULL,
+  ai_reply TEXT NOT NULL,
+  emotion VARCHAR(50),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 分析結果テーブル
+CREATE TABLE intelligence_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36),
+  analysis_type VARCHAR(50),
+  result_json JSONB NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- インデックス作成（パフォーマンス最適化）
+CREATE INDEX idx_donation_logs_guest_id ON donation_logs(guest_id);
+CREATE INDEX idx_donation_logs_shrine_id ON donation_logs(shrine_id);
+CREATE INDEX idx_chat_logs_guest_id ON chat_logs(guest_id);
+CREATE INDEX idx_intelligence_results_guest_id ON intelligence_results(guest_id);
+```
+
+### 13.2 ダミーデータ投入
+
+**002_seed_dummy_data.sql** （初期データ）
+```sql
+-- 推し神データ
+INSERT INTO oshigami (name, personality_prompt, blessing_type, image_url) VALUES
+('努力の神', '励ましの言葉で応援する。常にポジティブ。', 'success', '/images/oshigami/1.png'),
+('癒しの神', '優しく寄り添い、心を落ち着かせる。', 'healing', '/images/oshigami/2.png'),
+('学問の神', '知識を広げることを勧める。知的好奇心を刺激する。', 'knowledge', '/images/oshigami/3.png'),
+('恋愛の神', 'ロマンティックで前向き。幸せを応援する。', 'love', '/images/oshigami/4.png');
+
+-- 神社データ
+INSERT INTO shrines (name, location, description, verified) VALUES
+('八坂神社', '京都府京都市東山区', '祇園祭で有名。縁結びと厄除けの神社。', true),
+('伏見稲荷大社', '京都府京都市伏見区', '商売繁盛と家内安全。朱い鳥居が有名。', true),
+('厳島神社', '広島県廿日市市', '宮島にある世界遺産。海上の鳥居が有名。', true),
+('明治神宮', '東京都渋谷区', '明治天皇を祀る。初詣で多くの参拝者が訪れる。', true);
+```
+
+実行方法：
+```bash
+supabase db push
+```
+
+---
+
+## 14. 開発コマンド
+
+### 14.1 ビルド・実行
+
+```bash
+# 開発サーバー起動
+npm run dev
+
+# 本番ビルド
+npm run build
+
+# 本番環境で起動
+npm start
+
+# Linting
+npm run lint
+
+# 型チェック
+npm run type-check
+```
+
+### 14.2 Supabase関連
+
+```bash
+# ローカル開発環境起動
+supabase start
+
+# ローカル環境停止
+supabase stop
+
+# データベースマイグレーション確認
+supabase status
+
+# リモート環境にプッシュ
+supabase db push
+```
+
+---
+
+## 15. デプロイ方法
+
+### 15.1 Vercelへのデプロイ
+
+**初回セットアップ**
+```bash
+npm install -g vercel
+vercel login
+vercel
+```
+
+**環境変数設定（Vercelダッシュボード）**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `NEXT_PUBLIC_IO_INTELLIGENCE_API_KEY`
+
+**デプロイ実行**
+```bash
+vercel deploy --prod
+```
+
+### 15.2 Supabaseクラウド環境
+
+- Supabase公式サイト（https://supabase.com）でプロジェクト作成
+- CLI で紐づけ：`supabase link --project-ref xxx`
+- マイグレーション実行：`supabase db push`
+
+---
+
+## 16. デモ実装チェックリスト
+
+デモレベルの実装完了目安：
+
+- [ ] guest_id生成・localStorage保持機能
+- [ ] ホーム画面UI実装（Shadcn/UI）
+- [ ] 「おつとめ」ボタン実装 → donation_logs INSERT
+- [ ] 推し神AIチャット実装 → `/api/ai-chat` 連携
+- [ ] ダッシュボード画面（累計ポイント・ランキング表示）
+- [ ] `/api/intelligence` 連携（基本的な分析結果表示）
+- [ ] Supabase接続確認・ダミーデータ確認
+- [ ] Vercel デプロイ成功
+- [ ] ローカルテスト完了（E2E動作確認）
+
+---
+
+## 17. トラブルシューティング
+
+### Q: `NEXT_PUBLIC_SUPABASE_ANON_KEY` が無効なエラーが出る
+
+**A:** `.env.local` を再確認し、Supabaseダッシュボード → Settings → API で正しいキーをコピー。
+
+### Q: `npm run dev` が起動しない
+
+**A:** 
+```bash
+# キャッシュクリア
+rm -r .next node_modules
+npm install
+npm run dev
+```
+
+### Q: IO.Intelligence API が応答しない
+
+**A:** 
+- API_KEY を確認
+- API ドキュメント（提供予定）で仕様を再確認
+- Network タブで実際のリクエスト/レスポンス確認
+
+### Q: Supabase マイグレーション実行で SQL エラー
+
+**A:**
+```bash
+# エラーログ詳細確認
+supabase db pull  # 最新スキーマをローカルに同期
+```
+
+---
+
+## 18. 参考リンク
+
+- [Next.js 公式ドキュメント](https://nextjs.org/docs)
+- [Supabase ドキュメント](https://supabase.com/docs)
+- [Shadcn/UI コンポーネント集](https://ui.shadcn.com)
+- [IO.Intelligence API ドキュメント](https://docs.io-intelligence.ai)（準備中）
