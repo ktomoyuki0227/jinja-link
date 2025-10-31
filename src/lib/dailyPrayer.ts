@@ -92,18 +92,26 @@ export async function completeDailyPrayer(
     }
 
     // 2. donation_logs にボーナスポイント を記録
+    // shrine_id がないスキーマの場合は省略して、event_type='daily_prayer_bonus' だけで識別
+    const donationPayload: any = {
+      guest_id: guestId,
+      point: DAILY_PRAYER_BONUS,
+      event_type: "daily_prayer_bonus",
+    };
+
+    // shrine_id カラムがあれば追加
+    if (shrineId) {
+      donationPayload.shrine_id = parseInt(shrineId, 10);
+    }
+
     const { error: donationError } = await supabase
       .from("donation_logs")
-      .insert({
-        guest_id: guestId,
-        shrine_id: shrineId,
-        point: DAILY_PRAYER_BONUS,
-        event_type: "daily_prayer_bonus",
-      });
+      .insert(donationPayload);
 
     if (donationError) {
       console.error("donation_logs 記録エラー:", donationError);
-      throw donationError;
+      // prayer_tracker は作成されたので、このエラーはログするが続行
+      console.warn("donation_logs へのポイント記録失敗、ただし prayer_tracker は記録済み");
     }
 
     // 3. localStorage にキャッシュ
@@ -121,23 +129,15 @@ export async function completeDailyPrayer(
 }
 
 /**
- * モーダル表示フラグの管理（セッション内）
+ * モーダル表示フラグの管理
+ * 毎回表示するので、フラグチェックは不要（常に true を返す）
  */
 export function shouldShowDailyPrayerModal(): boolean {
-  const sessionKey = "omamori_daily_prayer_shown_today";
-  const today = getTodayString();
-  const cachedDate = sessionStorage.getItem(sessionKey);
-
-  // 本日表示済みならスキップ
-  if (cachedDate === today) {
-    return false;
-  }
-
+  // ページを開くたびに表示するため、常に true を返す
   return true;
 }
 
 export function markDailyPrayerModalShown(): void {
-  const sessionKey = "omamori_daily_prayer_shown_today";
-  const today = getTodayString();
-  sessionStorage.setItem(sessionKey, today);
+  // フラグ管理は不要（毎回表示するため）
+  // 何もしない
 }

@@ -5,7 +5,6 @@ import { getOrCreateGuestId } from "@/lib/utils";
 import {
   checkDailyPrayerStatus,
   shouldShowDailyPrayerModal,
-  markDailyPrayerModalShown,
 } from "@/lib/dailyPrayer";
 import Navigation from "@/components/Navigation";
 import HomeHero from "@/components/home/HomeHero";
@@ -22,6 +21,7 @@ export default function HomePage() {
       setGuestId(id);
 
       // 毎日のおつとめモーダル表示確認
+      // shouldShowDailyPrayerModal() は常に true を返す（毎回表示する）
       if (shouldShowDailyPrayerModal()) {
         const status = await checkDailyPrayerStatus(id);
         if (!status.has_prayed_today) {
@@ -33,7 +33,8 @@ export default function HomePage() {
   }, []);
 
   const handleDailyPrayerComplete = () => {
-    markDailyPrayerModalShown();
+    // フラグ管理は不要（毎回表示するため）
+    setShowDailyPrayerModal(false);
   };
 
   if (!guestId) {
@@ -57,7 +58,6 @@ export default function HomePage() {
           onComplete={handleDailyPrayerComplete}
           onClose={() => {
             setShowDailyPrayerModal(false);
-            markDailyPrayerModalShown();
           }}
         />
       )}
