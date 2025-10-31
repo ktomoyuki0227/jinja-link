@@ -22,7 +22,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadStatistics = async () => {
       try {
-        const id = getOrCreateGuestId();
+        const id = await getOrCreateGuestId();
         setGuestId(id);
 
         // 寄付ログからデータを取得

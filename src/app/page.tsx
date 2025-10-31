@@ -10,8 +10,11 @@ export default function HomePage() {
   const [guestId, setGuestId] = useState<string | null>(null);
 
   useEffect(() => {
-    const id = getOrCreateGuestId();
-    setGuestId(id);
+    const initializeGuest = async () => {
+      const id = await getOrCreateGuestId();
+      setGuestId(id);
+    };
+    initializeGuest();
   }, []);
 
   if (!guestId) {

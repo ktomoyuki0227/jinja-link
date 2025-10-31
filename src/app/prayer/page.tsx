@@ -43,7 +43,7 @@ export default function PrayerPage() {
 
   useEffect(() => {
     const initializePage = async () => {
-      const id = getOrCreateGuestId();
+      const id = await getOrCreateGuestId();
       setGuestId(id);
 
       // Supabaseから総ポイントを取得

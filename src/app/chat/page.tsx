@@ -38,8 +38,11 @@ export default function ChatPage() {
   const [selectedOshigami, setSelectedOshigami] = useState<string | null>(null);
 
   useEffect(() => {
-    const id = getOrCreateGuestId();
-    setGuestId(id);
+    const initializeGuest = async () => {
+      const id = await getOrCreateGuestId();
+      setGuestId(id);
+    };
+    initializeGuest();
     // 前回選択した推し神を取得
     const storedOshigami = localStorage.getItem("omamori_selected_oshigami");
     if (storedOshigami) {

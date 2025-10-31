@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from "uuid";
+import { supabase } from "./supabase";
 
 /**
  * ゲストIDを生成する
@@ -8,9 +9,10 @@ export function generateGuestId(): string {
 }
 
 /**
- * localStorageからゲストIDを取得する、なければ生成する
+ * localStorageからゲストIDを取得する、なければ生成してSupabaseに登録する
+ * Supabaseが利用不可の場合はlocalStorageのみを使用
  */
-export function getOrCreateGuestId(): string {
+export async function getOrCreateGuestId(): Promise<string> {
   if (typeof window === "undefined") {
     return generateGuestId();
   }
@@ -21,6 +23,36 @@ export function getOrCreateGuestId(): string {
   if (!guestId) {
     guestId = generateGuestId();
     localStorage.setItem(key, guestId);
+
+    // Supabaseに登録（エラーハンドリング付き）
+    try {
+      await supabase.from("users").insert({
+        guest_id: guestId,
+        total_points: 0,
+      });
+    } catch (err) {
+      console.warn("Supabaseへのユーザー登録に失敗しました:", err);
+      // Supabaseが利用不可でもlocalStorageは使用可能
+    }
+  } else {
+    // 既存のguestIdがSupabaseに登録されているか確認
+    try {
+      const { data } = await supabase
+        .from("users")
+        .select("id")
+        .eq("guest_id", guestId)
+        .single();
+
+      // 登録されていなければ登録
+      if (!data) {
+        await supabase.from("users").insert({
+          guest_id: guestId,
+          total_points: 0,
+        });
+      }
+    } catch (err) {
+      console.warn("Supabaseユーザー確認/登録に失敗しました:", err);
+    }
   }
 
   return guestId;
