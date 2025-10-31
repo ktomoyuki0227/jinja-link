@@ -36,6 +36,9 @@ lerna-debug.log*
 *~
 .swp
 
+# Build info
+tsconfig.tsbuildinfo
+
 # OS
 Thumbs.db
 .DS_Store
