@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 interface ChatInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -13,9 +13,9 @@ export default function ChatInput({
 }: ChatInputProps) {
   const [input, setInput] = useState("");
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (input.trim()) {
-      onSend(input);
+      await onSend(input);
       setInput("");
     }
   };
