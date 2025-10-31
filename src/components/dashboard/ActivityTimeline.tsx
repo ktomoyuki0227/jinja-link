@@ -5,7 +5,7 @@ interface ActivityTimelineProps {
 }
 
 export default function ActivityTimeline({
-  guestId,
+  guestId: _guestId,
 }: ActivityTimelineProps) {
   const activities = [
     {
