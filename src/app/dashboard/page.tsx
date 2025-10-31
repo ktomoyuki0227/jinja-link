@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getOrCreateGuestId } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import Navigation from "@/components/Navigation";
 import StatsCard from "@/components/dashboard/StatsCard";
 import DonationChart from "@/components/dashboard/DonationChart";
@@ -16,50 +17,97 @@ export default function DashboardPage() {
     messageCount: 0,
     preferredShrine: "未設定",
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const id = getOrCreateGuestId();
-    setGuestId(id);
+    const loadStatistics = async () => {
+      try {
+        const id = getOrCreateGuestId();
+        setGuestId(id);
 
-    // localStorageからデータを取得
-    const totalPoints = localStorage.getItem("omamori_total_points");
-    const donations = JSON.parse(
-      localStorage.getItem("omamori_donations") || "[]"
-    );
-    const messages = JSON.parse(
-      localStorage.getItem("omamori_chat_messages") || "[]"
-    );
+        // 寄付ログからデータを取得
+        const { data: donations, error: donationError } = await supabase
+          .from("donation_logs")
+          .select("point, shrine_id")
+          .eq("guest_id", id);
 
-    // 寄付が最も多い神社を計算
-    interface DonationCount {
-      [key: string]: number;
-    }
-    const shrineCounts: DonationCount = {};
-    donations.forEach(
-      (donation: { shrine_id: string }) => {
-        shrineCounts[donation.shrine_id] =
-          (shrineCounts[donation.shrine_id] || 0) + 1;
-      }
-    );
-    const preferredShrine =
-      Object.keys(shrineCounts).length > 0
-        ? Object.keys(shrineCounts).reduce((a, b) =>
+        if (donationError) {
+          console.error("寄付ログ取得エラー:", donationError);
+          return;
+        }
+
+        // チャットログからメッセージ数を取得
+        const { data: chats, error: chatError } = await supabase
+          .from("chat_logs")
+          .select("id")
+          .eq("guest_id", id);
+
+        if (chatError) {
+          console.error("チャットログ取得エラー:", chatError);
+          return;
+        }
+
+        // 総ポイント計算
+        const totalPoints = (donations || []).reduce(
+          (sum, log) => sum + (log.point || 0),
+          0
+        );
+
+        // 最も寄付している神社を計算
+        interface ShrineCount {
+          [key: string]: number;
+        }
+        const shrineCounts: ShrineCount = {};
+        (donations || []).forEach((donation) => {
+          if (donation.shrine_id) {
+            shrineCounts[donation.shrine_id] =
+              (shrineCounts[donation.shrine_id] || 0) + 1;
+          }
+        });
+
+        let preferredShrine = "未設定";
+        if (Object.keys(shrineCounts).length > 0) {
+          const topShrine = Object.keys(shrineCounts).reduce((a, b) =>
             shrineCounts[a] > shrineCounts[b] ? a : b
-          )
-        : "未設定";
+          );
+          // 神社IDから名前を取得（Supabaseから）
+          const { data: shrineData } = await supabase
+            .from("shrines")
+            .select("name")
+            .eq("id", topShrine)
+            .single();
 
-    setStats({
-      totalPoints: parseInt(totalPoints || "0", 10),
-      donationCount: donations.length,
-      messageCount: messages.length,
-      preferredShrine: preferredShrine === "未設定" ? "未設定" : `神社ID: ${preferredShrine}`,
-    });
+          preferredShrine = shrineData?.name || `神社ID: ${topShrine}`;
+        }
+
+        setStats({
+          totalPoints,
+          donationCount: donations?.length || 0,
+          messageCount: chats?.length || 0,
+          preferredShrine,
+        });
+      } catch (err) {
+        console.error("統計データ取得エラー:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStatistics();
   }, []);
 
   if (!guestId) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p>読み込み中...</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <p>統計データを取得中...</p>
       </div>
     );
   }
@@ -96,7 +144,7 @@ export default function DashboardPage() {
           />
           <StatsCard
             title="推し神"
-            value={localStorage.getItem("omamori_selected_oshigami") ? "設定済み" : "未設定"}
+            value={stats.preferredShrine}
             icon="⛩️"
             color="from-purple-400 to-purple-600"
           />
