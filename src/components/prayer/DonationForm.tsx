@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 interface DonationFormProps {
   shrineId: string;
@@ -22,24 +23,19 @@ export default function DonationForm({
     setMessage("");
 
     try {
-      // API呼び出し（現在はモック）
-      // 実装予定: /api/donation エンドポイント
-
-      // シミュレーション
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // ローカルストレージに保存
-      const donations = JSON.parse(
-        localStorage.getItem("omamori_donations") || "[]"
-      );
-      donations.push({
-        id: Math.random().toString(),
+      // Supabase に寄付ログを保存
+      const { error } = await supabase.from("donation_logs").insert({
         guest_id: guestId,
         shrine_id: shrineId,
         point: selectedPoints,
-        timestamp: new Date().toISOString(),
+        event_type: "prayer",
       });
-      localStorage.setItem("omamori_donations", JSON.stringify(donations));
+
+      if (error) {
+        console.error("寄付保存エラー:", error);
+        setMessage("寄付に失敗しました。もう一度お試しください。");
+        return;
+      }
 
       setMessage(
         `✨ ${selectedPoints}ポイントを寄付しました！ご支援ありがとうございます！`
@@ -51,7 +47,7 @@ export default function DonationForm({
       setTimeout(() => setMessage(""), 2000);
     } catch (error) {
       setMessage("寄付に失敗しました。もう一度お試しください。");
-      console.error(error);
+      console.error("寄付エラー:", error);
     } finally {
       setIsLoading(false);
     }

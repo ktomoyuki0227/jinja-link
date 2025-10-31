@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getOrCreateGuestId } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import Navigation from "@/components/Navigation";
 import PrayerCard from "@/components/prayer/PrayerCard";
 import DonationForm from "@/components/prayer/DonationForm";
@@ -41,19 +42,38 @@ export default function PrayerPage() {
   const [totalPoints, setTotalPoints] = useState(0);
 
   useEffect(() => {
-    const id = getOrCreateGuestId();
-    setGuestId(id);
-    // ローカルストレージからポイントを取得
-    const storedPoints = localStorage.getItem("omamori_total_points");
-    if (storedPoints) {
-      setTotalPoints(parseInt(storedPoints, 10));
-    }
+    const initializePage = async () => {
+      const id = getOrCreateGuestId();
+      setGuestId(id);
+
+      // Supabaseから総ポイントを取得
+      try {
+        const { data, error } = await supabase
+          .from("donation_logs")
+          .select("point")
+          .eq("guest_id", id);
+
+        if (error) {
+          console.error("ポイント取得エラー:", error);
+          return;
+        }
+
+        const total = (data || []).reduce(
+          (sum, log) => sum + (log.point || 0),
+          0
+        );
+        setTotalPoints(total);
+      } catch (err) {
+        console.error("ポイント計算エラー:", err);
+      }
+    };
+
+    initializePage();
   }, []);
 
-  const handleDonation = (points: number) => {
+  const handleDonation = async (points: number) => {
     const newTotal = totalPoints + points;
     setTotalPoints(newTotal);
-    localStorage.setItem("omamori_total_points", newTotal.toString());
   };
 
   if (!guestId) {
