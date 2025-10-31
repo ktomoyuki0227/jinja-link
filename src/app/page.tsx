@@ -2,20 +2,39 @@
 
 import { useEffect, useState } from "react";
 import { getOrCreateGuestId } from "@/lib/utils";
+import {
+  checkDailyPrayerStatus,
+  shouldShowDailyPrayerModal,
+  markDailyPrayerModalShown,
+} from "@/lib/dailyPrayer";
 import Navigation from "@/components/Navigation";
 import HomeHero from "@/components/home/HomeHero";
 import HomeCard from "@/components/home/HomeCard";
+import DailyPrayerModal from "@/components/DailyPrayerModal";
 
 export default function HomePage() {
   const [guestId, setGuestId] = useState<string | null>(null);
+  const [showDailyPrayerModal, setShowDailyPrayerModal] = useState(false);
 
   useEffect(() => {
     const initializeGuest = async () => {
       const id = await getOrCreateGuestId();
       setGuestId(id);
+
+      // 毎日のおつとめモーダル表示確認
+      if (shouldShowDailyPrayerModal()) {
+        const status = await checkDailyPrayerStatus(id);
+        if (!status.has_prayed_today) {
+          setShowDailyPrayerModal(true);
+        }
+      }
     };
     initializeGuest();
   }, []);
+
+  const handleDailyPrayerComplete = () => {
+    markDailyPrayerModalShown();
+  };
 
   if (!guestId) {
     return (
@@ -30,6 +49,19 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       <Navigation guestId={guestId} />
+
+      {/* 毎日のおつとめモーダル */}
+      {showDailyPrayerModal && (
+        <DailyPrayerModal
+          guestId={guestId}
+          onComplete={handleDailyPrayerComplete}
+          onClose={() => {
+            setShowDailyPrayerModal(false);
+            markDailyPrayerModalShown();
+          }}
+        />
+      )}
+
       <HomeHero />
       <div className="container mx-auto px-4 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

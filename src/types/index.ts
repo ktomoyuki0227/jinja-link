@@ -48,6 +48,21 @@ export interface ChatLog {
   created_at: string;
 }
 
+// Daily Prayer Types
+export interface DailyPrayerTracker {
+  id: string;
+  guest_id: string;
+  prayer_date: string; // YYYY-MM-DD format
+  bonus_points: number;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface DailyPrayerStatus {
+  has_prayed_today: boolean;
+  bonus_points: number;
+  last_prayer_date: string | null;
+}
 // Intelligence Results Types
 export interface IntelligenceResult {
   id: string;
