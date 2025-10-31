@@ -1,9 +1,10 @@
-# 🧾 要件定義書 Ver.3.1
+# 🧾 要件定義書 Ver.3.2
 
 **プロダクト名:** おまモリ。
 **副題:** 神社 × クリック募金 × 推し活で、「あなた」と「神社」をつなぐアプリ
 **構成:** Next.js × Supabase × IO.Intelligence（ログイン後回し構成）
 **作成日:** 2025年10月30日
+**更新日:** 2025年11月1日（毎日のおつとめボーナス機能追加）
 **作成者:** 久保 友幸（同志社大学 理工学部）
 
 ---
@@ -62,12 +63,13 @@ Next.jsとSupabaseを基盤とし、IO.Intelligenceを用いて
 | ID   | 機能名        | 内容                 | 技術                        |
 | ---- | ---------- | ------------------ | ------------------------- |
 | U-01 | guest_id生成 | 初回アクセス時にUUIDを生成・保持 | localStorage + uuid       |
-| U-02 | おつとめ       | 「祈る」ボタン押下でポイント加算   | Supabase DB               |
-| U-03 | 推し神AIチャット  | “人格を持つ神様”との対話      | IO.Intelligence API       |
-| U-04 | おみくじ       | ランダム運勢＋AIコメント生成    | IO.Intelligence API       |
-| U-05 | ポイント管理     | 累計ポイント表示・ランキング     | Supabase DB               |
-| U-06 | ダッシュボード    | 寄付傾向・AI分析の可視化      | Supabase + Intelligence出力 |
-| U-07 | 通知（任意）     | 毎日のおつとめリマインダー      | PWAローカル通知                 |
+| U-02 | 毎日のおつとめ  | アプリ起動時にボーナスポイント +10pt | Supabase prayer_tracker    |
+| U-03 | おつとめ       | 「祈る」ボタン押下でポイント加算   | Supabase DB               |
+| U-04 | 推し神AIチャット  | "人格を持つ神様"との対話      | IO.Intelligence API       |
+| U-05 | おみくじ       | ランダム運勢＋AIコメント生成    | IO.Intelligence API       |
+| U-06 | ポイント管理     | 累計ポイント表示・ランキング     | Supabase DB               |
+| U-07 | ダッシュボード    | 寄付傾向・AI分析の可視化      | Supabase + Intelligence出力 |
+| U-08 | 通知（任意）     | 毎日のおつとめリマインダー      | PWAローカル通知                 |
 
 ---
 
@@ -199,6 +201,15 @@ erDiagram
         timestamp created_at
     }
 
+    PRAYER_TRACKER {
+        uuid id PK
+        string guest_id
+        varchar prayer_date
+        int bonus_points
+        timestamp completed_at
+        timestamp created_at
+    }
+
     INTELLIGENCE_RESULTS {
         uuid id PK
         string type
@@ -208,6 +219,7 @@ erDiagram
 
     OSHIGAMI ||--o{ CHAT_LOGS : "AIキャラ対話ログ"
     SHRINES ||--o{ DONATION_LOGS : "寄付データ"
+    PRAYER_TRACKER ||--o{ DONATION_LOGS : "毎日ボーナス"
     INTELLIGENCE_RESULTS ||--o{ DONATION_LOGS : "分析対象"
 ```
 
@@ -218,25 +230,32 @@ erDiagram
 ```mermaid
 flowchart TD
 
-A[初回アクセス] --> B[guest_id生成(localStorage)]
-B --> C[ホーム画面表示]
-C --> D1[「おつとめ」クリック]
-C --> D2[推し神AIチャット開始]
+A[アプリ起動] --> B[guest_id生成/確認]
+B --> C{本日のおつとめ<br/>済み?}
+C -->|未実行| D[DailyPrayerModal表示]
+C -->|実行済み| H[ホーム画面表示]
 
-D1 --> E1[donation_logsにINSERT]
-E1 --> F1[Supabaseでポイント加算]
-F1 --> G1[Edge Functionで分析トリガー]
-G1 --> H1[IO.Intelligence分析結果保存]
+D --> E[神社選択]
+E --> F[お祈りボタン]
+F --> G[+10ポイント獲得<br/>prayer_tracker記録]
+G --> H
 
-D2 --> E2[メッセージ送信→/api/ai-chat]
-E2 --> F2[IO.IntelligenceキャラAI応答]
-F2 --> G2[chat_logsに保存]
-G2 --> H2[チャット画面に反映]
+H --> I1[「おつとめ」クリック]
+H --> I2[「チャット」クリック]
+H --> I3[「ダッシュボード」クリック]
 
-H1 & H2 --> I[ダッシュボード表示]
-I --> J1[寄付傾向・支援ランキング]
-I --> J2[行動パターン分析]
-I --> J3[神社別レポート]
+I1 --> J1[donation_logsにINSERT]
+J1 --> K1[ポイント加算表示]
+
+I2 --> J2[推し神選択]
+J2 --> K2[メッセージ送信]
+K2 --> L2[IO.Intelligence API]
+L2 --> M2[chat_logsに保存]
+M2 --> N2[AIコメント表示]
+
+I3 --> J3[統計情報表示]
+J3 --> K3[寄付傾向グラフ]
+J3 --> L3[活動タイムライン]
 ```
 
 ---
@@ -775,3 +794,197 @@ npm start
 - 多言語対応
 - アクセシビリティ改善（WCAG 2.1）
 - パフォーマンス最適化
+
+---
+
+## 13. Supabaseスキーマ & SQL
+
+以下は、Supabase PostgreSQLデータベースに実行するべきSQL一式です。
+
+### 13.1 prayer_tracker テーブル（毎日のおつとめボーナス用）
+
+```sql
+-- prayer_trackerテーブル作成
+CREATE TABLE IF NOT EXISTS prayer_tracker (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  prayer_date VARCHAR(10) NOT NULL,
+  bonus_points INTEGER DEFAULT 10,
+  completed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  CONSTRAINT unique_guest_prayer_date UNIQUE(guest_id, prayer_date)
+);
+
+-- インデックス作成（クエリ性能最適化）
+CREATE INDEX IF NOT EXISTS idx_prayer_tracker_guest_id 
+  ON prayer_tracker(guest_id);
+CREATE INDEX IF NOT EXISTS idx_prayer_tracker_prayer_date 
+  ON prayer_tracker(prayer_date);
+CREATE INDEX IF NOT EXISTS idx_prayer_tracker_guest_date 
+  ON prayer_tracker(guest_id, prayer_date);
+
+-- RLS有効化
+ALTER TABLE prayer_tracker ENABLE ROW LEVEL SECURITY;
+
+-- RLSポリシー
+CREATE POLICY prayer_tracker_select_all 
+  ON prayer_tracker FOR SELECT 
+  USING (TRUE);
+
+CREATE POLICY prayer_tracker_insert_all 
+  ON prayer_tracker FOR INSERT 
+  WITH CHECK (TRUE);
+
+CREATE POLICY prayer_tracker_update_all 
+  ON prayer_tracker FOR UPDATE 
+  USING (TRUE);
+
+CREATE POLICY prayer_tracker_delete_all 
+  ON prayer_tracker FOR DELETE 
+  USING (TRUE);
+```
+
+### 13.2 既存テーブルの確認
+
+その他のテーブルが未作成の場合、以下も実行してください：
+
+```sql
+-- usersテーブル（ゲストユーザー管理）
+CREATE TABLE IF NOT EXISTS users (
+  id VARCHAR(36) PRIMARY KEY,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- oshigami テーブル（推し神マスタ）
+CREATE TABLE IF NOT EXISTS oshigami (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  personality_prompt TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- shrines テーブル（神社マスタ）
+CREATE TABLE IF NOT EXISTS shrines (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- donation_logs テーブル（寄付・ポイント記録）
+CREATE TABLE IF NOT EXISTS donation_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  shrine_id INTEGER,
+  point INTEGER NOT NULL DEFAULT 1,
+  event_type VARCHAR(50) DEFAULT 'donation',
+  prayer_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (guest_id) REFERENCES users(id)
+);
+
+-- chat_logs テーブル（AIチャット履歴）
+CREATE TABLE IF NOT EXISTS chat_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  oshigami_id INTEGER NOT NULL,
+  user_message TEXT NOT NULL,
+  ai_response TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (guest_id) REFERENCES users(id),
+  FOREIGN KEY (oshigami_id) REFERENCES oshigami(id)
+);
+
+-- intelligence_results テーブル（AI分析結果キャッシュ）
+CREATE TABLE IF NOT EXISTS intelligence_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  analysis_type VARCHAR(50),
+  result_json JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (guest_id) REFERENCES users(id)
+);
+```
+
+### 13.3 初期データ挿入（オプション）
+
+```sql
+-- oshigami（推し神） サンプルデータ
+INSERT INTO oshigami (name, personality_prompt) VALUES
+  ('稲荷大明神', 'あなたは商売繁盛と豊かさの神です。ユーザーを励まし、事業成功をサポートします。'),
+  ('天照大神', 'あなたは太陽と光の神です。明るく前向きなアドバイスをします。'),
+  ('恵比寿神', 'あなたは福の神です。楽しく、フレンドリーにユーザーをサポートします。')
+ON CONFLICT DO NOTHING;
+
+-- shrines（神社） サンプルデータ
+INSERT INTO shrines (name) VALUES
+  ('伏見稲荷大社'),
+  ('伊勢神宮'),
+  ('出雲大社'),
+  ('厳島神社')
+ON CONFLICT DO NOTHING;
+```
+
+---
+
+## 14. 開発環境セットアップ
+
+### 14.1 必要なツール
+- Node.js v18.17以上
+- npm or yarn
+- Supabaseプロジェクト（無料プランOK）
+- IO.Intelligenceアカウント（APIキー）
+
+### 14.2 ローカル実行
+
+```bash
+# リポジトリクローン
+git clone https://github.com/ktomo/omamori.git
+cd omamori
+
+# 依存パッケージインストール
+npm install
+
+# 環境変数設定（.env.local.exampleをコピーして編集）
+cp .env.local.example .env.local
+# 以下の値を .env.local に設定:
+# - NEXT_PUBLIC_SUPABASE_URL
+# - NEXT_PUBLIC_SUPABASE_ANON_KEY
+# - NEXT_PUBLIC_IO_INTELLIGENCE_API_KEY
+# - NEXT_PUBLIC_IO_INTELLIGENCE_API_URL
+
+# 開発サーバー起動
+npm run dev
+
+# ブラウザで http://localhost:3000 を開く
+```
+
+### 14.3 本番デプロイ（Vercel推奨）
+
+```bash
+# Vercelプロジェクト初期化
+vercel
+
+# 環境変数をVercelに設定
+vercel env add NEXT_PUBLIC_SUPABASE_URL
+vercel env add NEXT_PUBLIC_SUPABASE_ANON_KEY
+vercel env add NEXT_PUBLIC_IO_INTELLIGENCE_API_KEY
+vercel env add NEXT_PUBLIC_IO_INTELLIGENCE_API_URL
+
+# デプロイ
+vercel --prod
+```
+
+---
+
+## 15. トラブルシューティング
+
+| 問題                           | 原因                      | 解決方法                                     |
+| ---------------------------- | ----------------------- | ------------------------------------------ |
+| `npm run dev` エラー            | .env.localが未設定          | `.env.local.example` をコピーして環境変数を設定 |
+| Supabase接続エラー              | ANON_KEYが無効           | Supabaseダッシュボードで確認・再設定            |
+| 毎日のおつとめが表示されない       | prayer_trackerテーブル未作成 | セクション13.1のSQLを実行してテーブル作成       |
+| AIチャット応答がない            | IO.Intelligence API未設定   | APIキーとURLを確認、.env.localを再設定        |
+| ポイント加算されない             | donation_logsテーブル未作成  | セクション13.2のSQLを実行してテーブル作成       |
+
+````
