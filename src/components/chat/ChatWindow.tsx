@@ -9,7 +9,7 @@ import ChatInput from "./ChatInput";
 interface ChatMessage {
   id: string;
   guest_id: string;
-  oshigami_id: string;
+  oshigami_id: number;
   user_message: string;
   ai_reply: string;
   emotion?: string;
@@ -44,11 +44,12 @@ export default function ChatWindow({
     const fetchChatHistory = async () => {
       try {
         setIsLoading(true);
+        const oshigamiIdNum = parseInt(oshigami.id, 10);
         const { data, error } = await supabase
           .from("chat_logs")
           .select("*")
           .eq("guest_id", guestId)
-          .eq("oshigami_id", oshigami.id)
+          .eq("oshigami_id", oshigamiIdNum)
           .order("created_at", { ascending: true });
 
         if (error) {
@@ -83,9 +84,10 @@ export default function ChatWindow({
       const aiReply = await generateAIResponse(userMessage);
 
       // Supabase に保存
+      const oshigamiIdNum = parseInt(oshigami.id, 10);
       const { error } = await supabase.from("chat_logs").insert({
         guest_id: guestId,
-        oshigami_id: oshigami.id,
+        oshigami_id: oshigamiIdNum,
         user_message: userMessage,
         ai_reply: aiReply,
         emotion: "neutral",
@@ -102,7 +104,7 @@ export default function ChatWindow({
         {
           id: Date.now().toString(),
           guest_id: guestId,
-          oshigami_id: oshigami.id,
+          oshigami_id: oshigamiIdNum,
           user_message: userMessage,
           ai_reply: aiReply,
           emotion: "neutral",
