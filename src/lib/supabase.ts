@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import { envConfig } from "./env";
 
-export const supabase = createClient(
-  envConfig.supabaseUrl,
-  envConfig.supabaseAnonKey
-);
+// 環境変数から Supabase の認証情報を取得
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+
+// Supabase クライアントの初期化
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
