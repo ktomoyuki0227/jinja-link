@@ -23,20 +23,36 @@ export default function DonationForm({
     setMessage("");
 
     try {
+      // shrine_id を整数に変換（Supabase テーブルは INTEGER 型）
+      const shrineIdNum = parseInt(shrineId, 10);
+      if (isNaN(shrineIdNum)) {
+        console.error("無効な shrine_id:", shrineId);
+        setMessage("寄付に失敗しました。神社IDが不正です。");
+        return;
+      }
+
+      console.log("📊 寄付ログを送信:", {
+        guest_id: guestId,
+        shrine_id: shrineIdNum,
+        point: selectedPoints,
+        event_type: "prayer",
+      });
+
       // Supabase に寄付ログを保存
       const { error } = await supabase.from("donation_logs").insert({
         guest_id: guestId,
-        shrine_id: shrineId,
+        shrine_id: shrineIdNum,
         point: selectedPoints,
         event_type: "prayer",
       });
 
       if (error) {
-        console.error("寄付保存エラー:", error);
-        setMessage("寄付に失敗しました。もう一度お試しください。");
+        console.error("❌ 寄付保存エラー:", error);
+        setMessage(`寄付に失敗しました: ${error.message}`);
         return;
       }
 
+      console.log("✅ 寄付保存成功");
       setMessage(
         `✨ ${selectedPoints}ポイントを寄付しました！ご支援ありがとうございます！`
       );
@@ -47,7 +63,7 @@ export default function DonationForm({
       setTimeout(() => setMessage(""), 2000);
     } catch (error) {
       setMessage("寄付に失敗しました。もう一度お試しください。");
-      console.error("寄付エラー:", error);
+      console.error("❌ 寄付エラー:", error);
     } finally {
       setIsLoading(false);
     }
