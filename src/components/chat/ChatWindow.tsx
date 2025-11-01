@@ -147,6 +147,7 @@ ${oshigami.personality}
 
       // IO.Intelligence API を呼び出し
       console.log("📡 API呼び出し:", `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`);
+      console.log("🔑 APIキー設定状態:", envConfig.ioIntelligenceApiKey ? "設定済み" : "未設定");
       
       const response = await fetch(
         `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`,
@@ -181,7 +182,7 @@ ${oshigami.personality}
           statusText: response.statusText,
           error: errorData,
         });
-        // フォールバック: モック応答
+        console.warn("⚠️ APIエラーが発生しました。モック応答にフォールバックします。");
         return getMockResponse(oshigami.personality);
       }
 
@@ -202,6 +203,7 @@ ${oshigami.personality}
       return getMockResponse(oshigami.personality);
     } catch (err) {
       console.error("❌ AI応答生成エラー:", err);
+      console.warn("⚠️ エラーが発生しました。モック応答にフォールバックします。");
       // フォールバック: モック応答
       return getMockResponse(oshigami.personality);
     }
