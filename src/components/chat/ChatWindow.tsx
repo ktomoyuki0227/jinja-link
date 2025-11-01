@@ -126,9 +126,30 @@ export default function ChatWindow({
   // AI応答生成関数
   const generateAIResponse = async (userMessage: string): Promise<string> => {
     try {
+      console.log("🔄 AI応答生成開始:", { oshigamiName: oshigami.name, personality: oshigami.personality });
+      
+      // APIキー確認
+      if (!envConfig.ioIntelligenceApiKey || !envConfig.ioIntelligenceApiUrl) {
+        console.warn("⚠️ IO.Intelligence APIが未設定です。モック応答を使用します。");
+        return getMockResponse(oshigami.personality);
+      }
+      
+      // システムプロンプト: 推し神のキャラクター性を指定
+      const systemPrompt = `あなたは「${oshigami.name}」という神社の神です。以下の性格で、ユーザーの質問や相談に対して応答してください：
+
+${oshigami.personality}
+
+重要なガイドライン：
+- 日本語で、親切かつ自然な言葉遣いで応答してください
+- 短すぎず、長すぎない回答（1-3文程度が目安）
+- ユーザーの具体的な状況や内容に対して、その性格らしい応答をしてください
+- 相手を尊重し、前向きかつ建設的な対応を心がけてください`;
+
       // IO.Intelligence API を呼び出し
+      console.log("📡 API呼び出し:", `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`);
+      
       const response = await fetch(
-        `${envConfig.ioIntelligenceApiUrl}/chat`,
+        `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`,
         {
           method: "POST",
           headers: {
@@ -136,24 +157,51 @@ export default function ChatWindow({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            guest_id: guestId,
-            prompt: userMessage,
-            oshigami_id: oshigami.id,
-            personality: oshigami.personality,
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "system",
+                content: systemPrompt,
+              },
+              {
+                role: "user",
+                content: userMessage,
+              },
+            ],
+            max_tokens: 256,
+            temperature: 0.8,
           }),
         }
       );
 
       if (!response.ok) {
-        console.error("API Error:", response.statusText);
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("❌ API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData,
+        });
         // フォールバック: モック応答
         return getMockResponse(oshigami.personality);
       }
 
       const result = await response.json();
-      return result.reply || getMockResponse(oshigami.personality);
+      console.log("✅ API応答取得:", result);
+      
+      // チャット完了形式の応答を処理
+      if (result.choices && result.choices[0] && result.choices[0].message) {
+        const aiReply = result.choices[0].message.content?.trim() || "";
+        if (aiReply) {
+          console.log("🤖 AI返答:", aiReply);
+          return aiReply;
+        }
+      }
+      
+      // フォールバック: モック応答
+      console.warn("⚠️ API応答が予期した形式ではありません。モック応答を使用します。");
+      return getMockResponse(oshigami.personality);
     } catch (err) {
-      console.error("AI応答生成エラー:", err);
+      console.error("❌ AI応答生成エラー:", err);
       // フォールバック: モック応答
       return getMockResponse(oshigami.personality);
     }
@@ -166,21 +214,29 @@ export default function ChatWindow({
         "頑張ってください！あなたなら必ずできます！",
         "応援しています。一歩一歩進めば大丈夫。",
         "失敗は成功の母。前に進んでいきましょう！",
+        "その勇気を大切にしてください。きっと道は開けます。",
+        "チャレンジすることが何より大切です。応援しています！",
       ],
       "優しく寄り添い、心を落ち着かせる。": [
         "そうなんですね。それは大変でしたね。",
         "あなたの気持ちをお聞かせください。",
         "ゆっくりでいいんですよ。焦らなくて大丈夫です。",
+        "そういう時もあります。今はゆっくり休んでください。",
+        "あなたの気持ちは大切です。一人じゃありませんよ。",
       ],
       "知識を広げることを勧める。知的好奇心を刺激する。": [
         "それは興味深いですね。もっと詳しく知ってみませんか？",
         "こういう視点もありますよ。",
         "勉強は素晴らしいことです。知識は財産ですから。",
+        "その好奇心を大切にしましょう。新しい発見があります。",
+        "もっと深く掘り下げると、新しい世界が見えてきますよ。",
       ],
       "ロマンティックで前向き。幸せを応援する。": [
         "素敵ですね！幸せになってください！",
         "そういう時間って大切ですよね。",
         "あなたの幸せを心から応援しています。",
+        "人生を楽しむことが一番大切です。素晴らしい。",
+        "その気持ちを大事にして、人生を輝かせてください。",
       ],
     };
 
