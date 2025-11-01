@@ -27,17 +27,21 @@ export async function getOrCreateGuestId(): Promise<string> {
     // Supabaseに登録（エラーハンドリング付き）
     try {
       console.log("📝 新規ユーザーをSupabaseに登録:", guestId);
-      const { error } = await supabase.from("users").insert({
+      const { data, error } = await supabase.from("users").insert({
         id: guestId,
-      });
+      }).select();
+      
       if (error) {
-        console.error("❌ Supabaseへのユーザー登録に失敗:", error);
+        console.error("❌ Supabaseへのユーザー登録に失敗:", error.message);
+        console.error("エラー詳細:", error);
+        throw error;
       } else {
-        console.log("✅ Supabaseへのユーザー登録成功");
+        console.log("✅ Supabaseへのユーザー登録成功:", data);
       }
     } catch (err) {
-      console.warn("⚠️ Supabaseへのユーザー登録に失敗しました:", err);
+      console.error("🔴 Supabaseへのユーザー登録に失敗しました:", err);
       // Supabaseが利用不可でもlocalStorageは使用可能
+      return guestId;
     }
   } else {
     // 既存のguestIdがSupabaseに登録されているか確認
@@ -49,18 +53,30 @@ export async function getOrCreateGuestId(): Promise<string> {
         .eq("id", guestId)
         .single();
 
+      // データベースエラー（404以外）の場合
+      if (error && error.code !== 'PGRST116') {
+        console.error("⚠️ Supabase照会エラー:", error.message);
+        return guestId;
+      }
+
       // 登録されていなければ登録
-      if (!data && !error) {
+      if (!data) {
         console.log("📝 既存ユーザーをSupabaseに登録:", guestId);
-        await supabase.from("users").insert({
+        const { error: insertError } = await supabase.from("users").insert({
           id: guestId,
-        });
+        }).select();
+        
+        if (insertError) {
+          console.error("❌ ユーザー登録に失敗:", insertError.message);
+          throw insertError;
+        }
         console.log("✅ 既存ユーザーのSupabase登録成功");
-      } else if (data) {
-        console.log("✅ ユーザーは既にSupabaseに登録済み");
+      } else {
+        console.log("✅ ユーザーは既にSupabaseに登録済み:", data);
       }
     } catch (err) {
-      console.warn("⚠️ Supabaseユーザー確認/登録に失敗しました:", err);
+      console.error("🔴 Supabaseユーザー確認/登録に失敗しました:", err);
+      // エラーが発生してもguestIdは返す（localStorageベース）
     }
   }
 
