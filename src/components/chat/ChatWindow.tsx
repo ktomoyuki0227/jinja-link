@@ -12,7 +12,6 @@ interface ChatMessage {
   oshigami_id: number;
   user_message: string;
   ai_reply: string;
-  emotion?: string;
   created_at: string;
 }
 
@@ -75,6 +74,7 @@ export default function ChatWindow({
 
   // メッセージ送信処理
   const handleSendMessage = async (userMessage: string) => {
+    console.log("📨 送信開始:", userMessage);  // ← デバッグログ
     if (!userMessage.trim()) return;
 
     try {
@@ -82,6 +82,7 @@ export default function ChatWindow({
 
       // AI応答を生成（IO.Intelligence API を使用）
       const aiReply = await generateAIResponse(userMessage);
+      console.log("🤖 AI応答生成完了:", aiReply);  // ← デバッグログ
 
       // Supabase に保存
       const oshigamiIdNum = parseInt(oshigami.id, 10);
@@ -90,29 +91,35 @@ export default function ChatWindow({
         oshigami_id: oshigamiIdNum,
         user_message: userMessage,
         ai_reply: aiReply,
-        emotion: "neutral",
+        // emotion: "neutral",  ← 削除（テーブルに存在しないため）
       });
 
       if (error) {
-        console.error("メッセージ保存エラー:", error);
+        console.error("❌ メッセージ保存エラー:", error);
         return;
       }
+      
+      console.log("💾 Supabase保存完了");  // ← デバッグログ
 
       // 画面に反映 - 保存後、チャット履歴を再取得
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          guest_id: guestId,
-          oshigami_id: oshigamiIdNum,
-          user_message: userMessage,
-          ai_reply: aiReply,
-          emotion: "neutral",
-          created_at: new Date().toISOString(),
-        },
-      ]);
+      const newMessage = {
+        id: Date.now().toString(),
+        guest_id: guestId,
+        oshigami_id: oshigamiIdNum,
+        user_message: userMessage,
+        ai_reply: aiReply,
+        created_at: new Date().toISOString(),
+      };
+      
+      console.log("📱 画面に追加するメッセージ:", newMessage);  // ← デバッグログ
+      
+      setMessages((prev) => {
+        const updated = [...prev, newMessage];
+        console.log("✅ メッセージ更新完了。現在のメッセージ数:", updated.length);  // ← デバッグログ
+        return updated;
+      });
     } catch (err) {
-      console.error("メッセージ送信エラー:", err);
+      console.error("❌ メッセージ送信エラー:", err);
     } finally {
       setIsSending(false);
     }
