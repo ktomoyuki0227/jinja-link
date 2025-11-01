@@ -26,32 +26,37 @@ export async function getOrCreateGuestId(): Promise<string> {
 
     // Supabaseに登録（エラーハンドリング付き）
     try {
+      console.log("📝 新しいゲストIDをSupabaseに登録:", guestId);
       await supabase.from("users").insert({
-        guest_id: guestId,
-        total_points: 0,
+        id: guestId,  // ← PRIMARY KEY カラム名に修正
       });
+      console.log("✅ ゲストID登録成功");
     } catch (err) {
-      console.warn("Supabaseへのユーザー登録に失敗しました:", err);
+      console.warn("⚠️ Supabaseへのユーザー登録に失敗しました:", err);
       // Supabaseが利用不可でもlocalStorageは使用可能
     }
   } else {
     // 既存のguestIdがSupabaseに登録されているか確認
     try {
+      console.log("🔍 既存ゲストIDを確認:", guestId);
       const { data } = await supabase
         .from("users")
         .select("id")
-        .eq("guest_id", guestId)
+        .eq("id", guestId)  // ← カラム名を `guest_id` から `id` に修正
         .single();
 
       // 登録されていなければ登録
       if (!data) {
+        console.log("📝 既存ゲストIDをSupabaseに登録:", guestId);
         await supabase.from("users").insert({
-          guest_id: guestId,
-          total_points: 0,
+          id: guestId,  // ← PRIMARY KEY カラム名に修正
         });
+        console.log("✅ 既存ゲストID登録成功");
+      } else {
+        console.log("✅ ゲストIDは既に登録済み");
       }
     } catch (err) {
-      console.warn("Supabaseユーザー確認/登録に失敗しました:", err);
+      console.warn("⚠️ Supabaseユーザー確認/登録に失敗しました:", err);
     }
   }
 

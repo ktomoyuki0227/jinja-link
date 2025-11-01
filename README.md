@@ -851,7 +851,7 @@ CREATE POLICY prayer_tracker_delete_all
 ```sql
 -- usersテーブル（ゲストユーザー管理）
 CREATE TABLE IF NOT EXISTS users (
-  id VARCHAR(36) PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
