@@ -146,11 +146,11 @@ ${oshigami.personality}
 - 相手を尊重し、前向きかつ建設的な対応を心がけてください`;
 
       // IO.Intelligence API を呼び出し
-      console.log("📡 API呼び出し:", `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`);
+      console.log("📡 API呼び出し:", `${envConfig.ioIntelligenceApiUrl}/chat/completions`);
       console.log("🔑 APIキー設定状態:", envConfig.ioIntelligenceApiKey ? "設定済み" : "未設定");
       
       const response = await fetch(
-        `${envConfig.ioIntelligenceApiUrl}/v1/chat/completions`,
+        `${envConfig.ioIntelligenceApiUrl}/chat/completions`,
         {
           method: "POST",
           headers: {
@@ -158,7 +158,7 @@ ${oshigami.personality}
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4o-mini",
+            model: "meta-llama/Llama-3.3-70B-Instruct",
             messages: [
               {
                 role: "system",
@@ -169,7 +169,7 @@ ${oshigami.personality}
                 content: userMessage,
               },
             ],
-            max_tokens: 256,
+            max_completion_tokens: 256,
             temperature: 0.8,
           }),
         }
