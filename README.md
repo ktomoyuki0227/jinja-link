@@ -856,6 +856,21 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- RLS (Row Level Security) ポリシー - users テーブル
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY users_select_all 
+  ON users FOR SELECT 
+  USING (TRUE);
+
+CREATE POLICY users_insert_all 
+  ON users FOR INSERT 
+  WITH CHECK (TRUE);
+
+CREATE POLICY users_update_all 
+  ON users FOR UPDATE 
+  USING (TRUE);
+
 -- oshigami テーブル（推し神マスタ）
 CREATE TABLE IF NOT EXISTS oshigami (
   id SERIAL PRIMARY KEY,
@@ -864,6 +879,13 @@ CREATE TABLE IF NOT EXISTS oshigami (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- RLS ポリシー - oshigami テーブル
+ALTER TABLE oshigami ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY oshigami_select_all 
+  ON oshigami FOR SELECT 
+  USING (TRUE);
+
 -- shrines テーブル（神社マスタ）
 CREATE TABLE IF NOT EXISTS shrines (
   id SERIAL PRIMARY KEY,
@@ -871,21 +893,12 @@ CREATE TABLE IF NOT EXISTS shrines (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- donation_logs テーブル（寄付・ポイント記録）
-CREATE TABLE IF NOT EXISTS donation_logs (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guest_id UUID NOT NULL,
-  shrine_id INTEGER,
-  point INTEGER NOT NULL DEFAULT 1,
-  event_type VARCHAR(50) DEFAULT 'donation',
-  prayer_reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  FOREIGN KEY (guest_id) REFERENCES users(id)
-);
-  prayer_reason TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  FOREIGN KEY (guest_id) REFERENCES users(id)
-);
+-- RLS ポリシー - shrines テーブル
+ALTER TABLE shrines ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY shrines_select_all 
+  ON shrines FOR SELECT 
+  USING (TRUE);
 
 -- chat_logs テーブル（AIチャット履歴）
 CREATE TABLE IF NOT EXISTS chat_logs (
@@ -899,6 +912,25 @@ CREATE TABLE IF NOT EXISTS chat_logs (
   FOREIGN KEY (oshigami_id) REFERENCES oshigami(id)
 );
 
+-- インデックス
+CREATE INDEX IF NOT EXISTS idx_chat_logs_guest_id ON chat_logs(guest_id);
+CREATE INDEX IF NOT EXISTS idx_chat_logs_oshigami_id ON chat_logs(oshigami_id);
+
+-- RLS ポリシー - chat_logs テーブル
+ALTER TABLE chat_logs ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY chat_logs_select_all 
+  ON chat_logs FOR SELECT 
+  USING (TRUE);
+
+CREATE POLICY chat_logs_insert_all 
+  ON chat_logs FOR INSERT 
+  WITH CHECK (TRUE);
+
+CREATE POLICY chat_logs_update_all 
+  ON chat_logs FOR UPDATE 
+  USING (TRUE);
+
 -- intelligence_results テーブル（AI分析結果キャッシュ）
 CREATE TABLE IF NOT EXISTS intelligence_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -908,6 +940,24 @@ CREATE TABLE IF NOT EXISTS intelligence_results (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   FOREIGN KEY (guest_id) REFERENCES users(id)
 );
+
+-- インデックス
+CREATE INDEX IF NOT EXISTS idx_intelligence_results_guest_id ON intelligence_results(guest_id);
+
+-- RLS ポリシー - intelligence_results テーブル
+ALTER TABLE intelligence_results ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY intelligence_results_select_all 
+  ON intelligence_results FOR SELECT 
+  USING (TRUE);
+
+CREATE POLICY intelligence_results_insert_all 
+  ON intelligence_results FOR INSERT 
+  WITH CHECK (TRUE);
+
+CREATE POLICY intelligence_results_update_all 
+  ON intelligence_results FOR UPDATE 
+  USING (TRUE);
 ```
 
 ### 13.2.1 donation_logs テーブルと RLS ポリシー
