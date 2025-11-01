@@ -26,11 +26,15 @@ export async function getOrCreateGuestId(): Promise<string> {
 
     // Supabaseに登録（エラーハンドリング付き）
     try {
-      console.log("📝 新しいゲストIDをSupabaseに登録:", guestId);
-      await supabase.from("users").insert({
-        id: guestId,  // ← PRIMARY KEY カラム名に修正
+      console.log("📝 新規ユーザーをSupabaseに登録:", guestId);
+      const { error } = await supabase.from("users").insert({
+        id: guestId,
       });
-      console.log("✅ ゲストID登録成功");
+      if (error) {
+        console.error("❌ Supabaseへのユーザー登録に失敗:", error);
+      } else {
+        console.log("✅ Supabaseへのユーザー登録成功");
+      }
     } catch (err) {
       console.warn("⚠️ Supabaseへのユーザー登録に失敗しました:", err);
       // Supabaseが利用不可でもlocalStorageは使用可能
@@ -38,22 +42,22 @@ export async function getOrCreateGuestId(): Promise<string> {
   } else {
     // 既存のguestIdがSupabaseに登録されているか確認
     try {
-      console.log("🔍 既存ゲストIDを確認:", guestId);
-      const { data } = await supabase
+      console.log("🔍 既存ユーザーをSupabaseで確認:", guestId);
+      const { data, error } = await supabase
         .from("users")
         .select("id")
-        .eq("id", guestId)  // ← カラム名を `guest_id` から `id` に修正
+        .eq("id", guestId)
         .single();
 
       // 登録されていなければ登録
-      if (!data) {
-        console.log("📝 既存ゲストIDをSupabaseに登録:", guestId);
+      if (!data && !error) {
+        console.log("📝 既存ユーザーをSupabaseに登録:", guestId);
         await supabase.from("users").insert({
-          id: guestId,  // ← PRIMARY KEY カラム名に修正
+          id: guestId,
         });
-        console.log("✅ 既存ゲストID登録成功");
-      } else {
-        console.log("✅ ゲストIDは既に登録済み");
+        console.log("✅ 既存ユーザーのSupabase登録成功");
+      } else if (data) {
+        console.log("✅ ユーザーは既にSupabaseに登録済み");
       }
     } catch (err) {
       console.warn("⚠️ Supabaseユーザー確認/登録に失敗しました:", err);

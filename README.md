@@ -874,10 +874,14 @@ CREATE TABLE IF NOT EXISTS shrines (
 -- donation_logs テーブル（寄付・ポイント記録）
 CREATE TABLE IF NOT EXISTS donation_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guest_id VARCHAR(36) NOT NULL,
+  guest_id UUID NOT NULL,
   shrine_id INTEGER,
   point INTEGER NOT NULL DEFAULT 1,
   event_type VARCHAR(50) DEFAULT 'donation',
+  prayer_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (guest_id) REFERENCES users(id)
+);
   prayer_reason TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   FOREIGN KEY (guest_id) REFERENCES users(id)
@@ -886,7 +890,7 @@ CREATE TABLE IF NOT EXISTS donation_logs (
 -- chat_logs テーブル（AIチャット履歴）
 CREATE TABLE IF NOT EXISTS chat_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guest_id VARCHAR(36) NOT NULL,
+  guest_id UUID NOT NULL,
   oshigami_id INTEGER NOT NULL,
   user_message TEXT NOT NULL,
   ai_response TEXT NOT NULL,
@@ -898,7 +902,7 @@ CREATE TABLE IF NOT EXISTS chat_logs (
 -- intelligence_results テーブル（AI分析結果キャッシュ）
 CREATE TABLE IF NOT EXISTS intelligence_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guest_id VARCHAR(36) NOT NULL,
+  guest_id UUID NOT NULL,
   analysis_type VARCHAR(50),
   result_json JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -908,13 +912,19 @@ CREATE TABLE IF NOT EXISTS intelligence_results (
 
 ### 13.2.1 donation_logs テーブルと RLS ポリシー
 
-以下の SQL を Supabase SQL Editor で実行してください：
+**⚠️ 重要: 既存の donation_logs テーブルが存在する場合は、以下を実行して削除してから再作成してください：**
+
+```sql
+DROP TABLE IF EXISTS donation_logs CASCADE;
+```
+
+その後、以下の SQL を Supabase SQL Editor で実行してください：
 
 ```sql
 -- donation_logs テーブル（寄付・ポイント記録）
 CREATE TABLE IF NOT EXISTS donation_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  guest_id VARCHAR(36) NOT NULL,
+  guest_id UUID NOT NULL,
   shrine_id INTEGER,
   point INTEGER NOT NULL DEFAULT 1,
   event_type VARCHAR(50) DEFAULT 'donation',
