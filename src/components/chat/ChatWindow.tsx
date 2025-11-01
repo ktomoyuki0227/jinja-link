@@ -9,7 +9,7 @@ import ChatInput from "./ChatInput";
 interface ChatMessage {
   id: string;
   guest_id: string;
-  oshigami_id: number;
+  oshigami_id: string;
   user_message: string;
   ai_reply: string;
   created_at: string;
@@ -43,12 +43,11 @@ export default function ChatWindow({
     const fetchChatHistory = async () => {
       try {
         setIsLoading(true);
-        const oshigamiIdNum = parseInt(oshigami.id, 10);
         const { data, error } = await supabase
           .from("chat_logs")
           .select("*")
           .eq("guest_id", guestId)
-          .eq("oshigami_id", oshigamiIdNum)
+          .eq("oshigami_id", oshigami.id)
           .order("created_at", { ascending: true });
 
         if (error) {
@@ -85,10 +84,9 @@ export default function ChatWindow({
       console.log("🤖 AI応答生成完了:", aiReply);  // ← デバッグログ
 
       // Supabase に保存
-      const oshigamiIdNum = parseInt(oshigami.id, 10);
       const { error } = await supabase.from("chat_logs").insert({
         guest_id: guestId,
-        oshigami_id: oshigamiIdNum,
+        oshigami_id: oshigami.id,
         user_message: userMessage,
         ai_reply: aiReply,
         // emotion: "neutral",  ← 削除（テーブルに存在しないため）
@@ -105,7 +103,7 @@ export default function ChatWindow({
       const newMessage = {
         id: Date.now().toString(),
         guest_id: guestId,
-        oshigami_id: oshigamiIdNum,
+        oshigami_id: oshigami.id,
         user_message: userMessage,
         ai_reply: aiReply,
         created_at: new Date().toISOString(),

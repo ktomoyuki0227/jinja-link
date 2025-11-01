@@ -2,11 +2,19 @@
 
 import { useState, useEffect } from "react";
 import { getOrCreateGuestId } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import Navigation from "@/components/Navigation";
 import ChatWindow from "@/components/chat/ChatWindow";
 import OshigamiSelector from "@/components/chat/OshigamiSelector";
 
-const MOCK_OSHIGAMI = [
+interface OshigamiOption {
+  id: string;
+  name: string;
+  personality: string;
+  icon: string;
+}
+
+const FALLBACK_OSHIGAMI: OshigamiOption[] = [
   {
     id: "1",
     name: "努力の神",
@@ -36,6 +44,8 @@ const MOCK_OSHIGAMI = [
 export default function ChatPage() {
   const [guestId, setGuestId] = useState<string | null>(null);
   const [selectedOshigami, setSelectedOshigami] = useState<string | null>(null);
+  const [oshigamiList, setOshigamiList] = useState<OshigamiOption[]>(FALLBACK_OSHIGAMI);
+  const [isLoadingOshigami, setIsLoadingOshigami] = useState<boolean>(true);
 
   useEffect(() => {
     const initializeGuest = async () => {
@@ -43,16 +53,87 @@ export default function ChatPage() {
       setGuestId(id);
     };
     initializeGuest();
-    // 前回選択した推し神を取得
-    const storedOshigami = localStorage.getItem("omamori_selected_oshigami");
-    if (storedOshigami) {
-      setSelectedOshigami(storedOshigami);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = localStorage.getItem("omamori_selected_oshigami");
+    if (stored) {
+      setSelectedOshigami(stored);
     }
+  }, []);
+
+  useEffect(() => {
+    const selectInitialOshigami = (list: OshigamiOption[]) => {
+      setSelectedOshigami((current) => {
+        const stored =
+          typeof window !== "undefined"
+            ? localStorage.getItem("omamori_selected_oshigami")
+            : null;
+
+        const preferred = current || stored;
+        if (preferred && list.some((item) => item.id === preferred)) {
+          return preferred;
+        }
+
+        if (preferred && typeof window !== "undefined") {
+          localStorage.removeItem("omamori_selected_oshigami");
+        }
+
+        return null;
+      });
+    };
+
+    const fetchOshigami = async () => {
+      try {
+        setIsLoadingOshigami(true);
+        const { data, error } = await supabase
+          .from("oshigami")
+          .select("id, name, personality_prompt")
+          .order("created_at", { ascending: true });
+
+        if (error) {
+          console.error("推し神データ取得エラー:", error);
+          setOshigamiList(FALLBACK_OSHIGAMI);
+          selectInitialOshigami(FALLBACK_OSHIGAMI);
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          setOshigamiList(FALLBACK_OSHIGAMI);
+          selectInitialOshigami(FALLBACK_OSHIGAMI);
+          return;
+        }
+
+        const fallbackIcons = FALLBACK_OSHIGAMI.map((item) => item.icon);
+        const mapped = data.map((item, index) => {
+          return {
+            id: item.id,
+            name: item.name,
+            personality: item.personality_prompt || "",
+            icon: fallbackIcons[index % fallbackIcons.length],
+          };
+        });
+
+        setOshigamiList(mapped);
+        selectInitialOshigami(mapped);
+      } catch (err) {
+        console.error("推し神データ取得中に予期せぬエラー:", err);
+        setOshigamiList(FALLBACK_OSHIGAMI);
+        selectInitialOshigami(FALLBACK_OSHIGAMI);
+      } finally {
+        setIsLoadingOshigami(false);
+      }
+    };
+
+    fetchOshigami();
   }, []);
 
   const handleSelectOshigami = (oshigamiId: string) => {
     setSelectedOshigami(oshigamiId);
-    localStorage.setItem("omamori_selected_oshigami", oshigamiId);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("omamori_selected_oshigami", oshigamiId);
+    }
   };
 
   if (!guestId) {
@@ -68,14 +149,16 @@ export default function ChatPage() {
       <Navigation guestId={guestId} />
 
       <div className="container mx-auto px-4 py-12">
-        {!selectedOshigami ? (
+        {isLoadingOshigami ? (
+          <p className="text-gray-600 mb-8">推し神を読み込み中です...</p>
+        ) : !selectedOshigami ? (
           <>
             <h1 className="text-3xl font-bold mb-2">💬 推し神AIチャット</h1>
             <p className="text-gray-600 mb-8">
               あなたの推し神を選んで、対話を始めよう。毎日のおつとめの中で、心を豊かに。
             </p>
             <OshigamiSelector
-              oshigami={MOCK_OSHIGAMI}
+              oshigami={oshigamiList}
               onSelect={handleSelectOshigami}
             />
           </>
@@ -83,10 +166,15 @@ export default function ChatPage() {
           <ChatWindow
             guestId={guestId}
             oshigami={
-              MOCK_OSHIGAMI.find((o) => o.id === selectedOshigami) ||
-              MOCK_OSHIGAMI[0]
+              oshigamiList.find((o) => o.id === selectedOshigami) ||
+              oshigamiList[0]
             }
-            onChangeOshigami={() => setSelectedOshigami(null)}
+            onChangeOshigami={() => {
+              setSelectedOshigami(null);
+              if (typeof window !== "undefined") {
+                localStorage.removeItem("omamori_selected_oshigami");
+              }
+            }}
           />
         )}
       </div>
