@@ -906,6 +906,51 @@ CREATE TABLE IF NOT EXISTS intelligence_results (
 );
 ```
 
+### 13.2.1 donation_logs テーブルと RLS ポリシー
+
+以下の SQL を Supabase SQL Editor で実行してください：
+
+```sql
+-- donation_logs テーブル（寄付・ポイント記録）
+CREATE TABLE IF NOT EXISTS donation_logs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  guest_id VARCHAR(36) NOT NULL,
+  shrine_id INTEGER,
+  point INTEGER NOT NULL DEFAULT 1,
+  event_type VARCHAR(50) DEFAULT 'donation',
+  prayer_reason TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  FOREIGN KEY (guest_id) REFERENCES users(id)
+);
+
+-- インデックス
+CREATE INDEX IF NOT EXISTS idx_donation_logs_guest_id ON donation_logs(guest_id);
+CREATE INDEX IF NOT EXISTS idx_donation_logs_shrine_id ON donation_logs(shrine_id);
+
+-- RLS (Row Level Security) ポリシー
+ALTER TABLE donation_logs ENABLE ROW LEVEL SECURITY;
+
+-- 全員が SELECT できる（匿名ユーザーも含む）
+CREATE POLICY donation_logs_select_all 
+  ON donation_logs FOR SELECT 
+  USING (TRUE);
+
+-- 全員が INSERT できる（匿名ユーザーも含む）
+CREATE POLICY donation_logs_insert_all 
+  ON donation_logs FOR INSERT 
+  WITH CHECK (TRUE);
+
+-- 全員が UPDATE できる（匿名ユーザーも含む）
+CREATE POLICY donation_logs_update_all 
+  ON donation_logs FOR UPDATE 
+  USING (TRUE);
+
+-- 全員が DELETE できる（匿名ユーザーも含む）
+CREATE POLICY donation_logs_delete_all 
+  ON donation_logs FOR DELETE 
+  USING (TRUE);
+```
+
 ### 13.3 初期データ挿入（オプション）
 
 ```sql
